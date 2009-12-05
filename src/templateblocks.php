@@ -11,7 +11,7 @@ function block($name, $content='') {
 	TemplateBlock::init();
 	$block = new TemplateBlock($name, ob_get_length());
 	$block->content = $content;
-	TemplateBlock::report($block);
+	TemplateBlock::register($block);
 }
 
 
@@ -22,7 +22,7 @@ function block($name, $content='') {
 function funcblock($name, $func) {
 	TemplateBlock::init();
 	$block = new TemplateFuncBlock($name, ob_get_length(), $func);
-	TemplateBlock::report($block);
+	TemplateBlock::register($block);
 }
 
 
@@ -42,8 +42,8 @@ function startblock($name, $filters='') {
 		}
 		$block->filters = $filters;
 	}
-	TemplateBlock::report($block);    // for establishing parent/child relationships
-	TemplateBlock::$stack[] = $block; // needs to go after report()
+	TemplateBlock::register($block);  // for establishing parent/child relationships
+	TemplateBlock::$stack[] = $block; // needs to go after register()
 	ob_start();
 }
 
@@ -69,7 +69,7 @@ function superblock() {
 	$block = end(TemplateBlock::$stack);
 	if ($block) {
 		if ($block->super) {
-			return $block->super->strval();
+			return $block->super->compile();
 		}
 	}else{
 		// throw warning
@@ -81,7 +81,7 @@ function superblock() {
 // ends the current template and sends the final output to the browser
 
 function flushblocks() {
-	ob_end_flush(); // will call buffer_callback
+	TemplateBlock::flush();
 }
 
 
@@ -110,8 +110,7 @@ class TemplateBlock {
 	
 	static function init() {
 		if (self::$stack && !self::in_base_child()) {
-			ob_end_flush();
-			self::$stack = null;
+			self::flush();
 		}
 		if (!self::$stack) {
 			$block = new TemplateBlock();
@@ -126,7 +125,7 @@ class TemplateBlock {
 	
 	// just encountered a new block, find a place for it
 	
-	static function report($block) {
+	static function register($block) {
 		if (count(self::$stack) == 1 && !self::in_base()) {
 			if (self::$base_cutoff === null) {
 				self::$base_cutoff = ob_get_length();
@@ -143,21 +142,34 @@ class TemplateBlock {
 	}
 	
 	
-	// called when the base output buffer is cleaned/flushed
+	static function flush() {
+		self::destroy_stack();
+		echo self::compile_base(ob_get_clean());
+	}
 	
 	static function buffer_callback($content) {
-		$block = array_pop(self::$stack);
 		if (self::$stack) {
-			foreach (self::$stack as $b) {
-				// throw warning
-			}
-			self::$stack = null;
+			self::destroy_stack();
+			return self::compile_base($content);
 		}
-		self::$base = null;
-		self::$base_trace = null;
-		$block->content = $content; //self::$base_cutoff ? substr($content, 0, self::$base_cutoff) : $content; //!! was causing double to fail
-		self::$base_cutoff = null;
-		return $block->strval();
+		return '';
+	}
+	
+	static function destroy_stack() {
+		$stack = self::$stack;
+		for ($i=count($stack)-1; $i>=1; $i--) {
+			// $stack[$i]; // throw warning
+		}
+		self::$stack = null;
+	}
+	
+	static function compile_base($content) {
+		if (self::$base_cutoff) {
+			// be smart about getting rid of accumulated trailing whitespace
+			$content = rtrim(substr($content, 0, self::$base_cutoff)) . ltrim(substr($content, self::$base_cutoff));
+		}
+		self::$base->content = $content;
+		return self::$base->compile();
 	}
 	
 	
@@ -246,7 +258,7 @@ class TemplateBlock {
 	
 	// compile all children and generate string output
 	
-	function strval() {
+	function compile() {
 		$parts = array();
 		$content = $this->get_content();
 		foreach ($this->filters as $filter) {
@@ -256,7 +268,7 @@ class TemplateBlock {
 		foreach ($this->children as $child) {
 			$i = $child->index; // a string index of $content
 			$parts[] = substr($content, $previ, $i-$previ);
-			$parts[] = $child->strval();
+			$parts[] = $child->compile();
 			$previ = $i;
 		}
 		$parts[] = substr($content, $previ);

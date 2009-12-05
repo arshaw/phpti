@@ -28,10 +28,7 @@ thie is some cool content
 this is the default footer
 </div>
 </body>
-</html>
-
-
-<html>
+</html><html>
 <head>
 <link rel='stylesheet' type='text/css' href='main.css' />
 <script type='text/javascript' src='main.js'></script>

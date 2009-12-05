@@ -1,0 +1,25 @@
+
+Template Inheritance in Pure PHP
+--------------------------------
+
+From a child template, to inherit a parent template:
+
+	include 'parent_template.php';
+	
+Define a block:
+
+	<? startblock('blockname') ?>
+	...
+	<? endblock() ?>
+	
+Define an empty block:
+
+	<? block('blockname') ?>
+	
+Reference the overridden block:
+
+	<? startblock('footer') ?>
+	<?= superblock() ?> - Copyright 2009
+	<? endblock() ?>
+	
+more docs/examples to come...

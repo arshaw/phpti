@@ -16,11 +16,10 @@ $GLOBALS['_HTML_Template_Inheritance_hash'] = null;
 
 
 function block($name, $content='') {
-	$block = array(
+	HTML_Template_Inheritance::registerBlock(array(
 		'name' => $name,
 		'content' => $content
-	);
-	HTML_Template_Inheritance::registerBlock($block);
+	));
 }
 
 
@@ -35,12 +34,11 @@ function startblock($name, $filters=array()) {
 	}else{
 		$filters = array();
 	}
-	$block = array(
-		'name' => $name,
-		'filters' => $filters
-	);
-	HTML_Template_Inheritance::registerBlock($block);
-	$GLOBALS['_HTML_Template_Inheritance_stack'][] =& $block;
+	$GLOBALS['_HTML_Template_Inheritance_stack'][] =&
+		HTML_Template_Inheritance::registerBlock(array(
+			'name' => $name,
+			'filters' => $filters
+		));
 	ob_start(array('HTML_Template_Inheritance', 'nestedBufferCallback'));
 }
 
@@ -109,7 +107,7 @@ class HTML_Template_Inheritance {
 	}
 	
 	
-	function registerBlock(&$block) { // TODO: accept a non-reference, return a reference
+	function &registerBlock($block) {
 		HTML_Template_Inheritance::init();
 		$base =& $GLOBALS['_HTML_Template_Inheritance_base'];
 		$stack =& $GLOBALS['_HTML_Template_Inheritance_stack'];
@@ -160,6 +158,7 @@ class HTML_Template_Inheritance {
 				$block['super'] =& $super;
 			}
 		}
+		return $block;
 	}
 	
 	

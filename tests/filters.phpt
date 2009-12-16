@@ -5,7 +5,7 @@ test the filter argument of startblock, with filters as a string and array
 --FILE--
 
 <?
-require_once '../src/templateblocks.php';
+require_once '../src/templateinheritance.php';
 include 'templates/base.php';
 
 function filter1($s) {

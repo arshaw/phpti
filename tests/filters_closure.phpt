@@ -13,7 +13,7 @@ if (PHP_MAJOR_VERSION < 5 || PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION < 3) {
 --FILE--
 
 <?php
-require_once '../src/templateblocks.php';
+require_once '../src/templateinheritance.php';
 include 'templates/base.php';
 
 $filter1 = function($s) {

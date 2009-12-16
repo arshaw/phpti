@@ -1,6 +1,11 @@
 <?php
 
-require_once dirname(__FILE__) . '/debug.php';
+// author: Adam Shaw
+// Dual licensed under the MIT and GPL licenses (MIT-LICENSE.txt and GPL-LICENSE.txt)
+
+
+
+//require_once dirname(__FILE__) . '/debug.php';
 
 
 
@@ -104,7 +109,7 @@ class HTML_Template_Inheritance {
 	}
 	
 	
-	function registerBlock(&$block) {
+	function registerBlock(&$block) { // TODO: accept a non-reference, return a reference
 		HTML_Template_Inheritance::init();
 		$base =& $GLOBALS['_HTML_Template_Inheritance_base'];
 		$stack =& $GLOBALS['_HTML_Template_Inheritance_stack'];

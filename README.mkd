@@ -1,6 +1,6 @@
 
-Template Inheritance in Pure PHP
---------------------------------
+Template Inheritance in Straight PHP
+------------------------------------
 
 From a child template, to inherit a parent template:
 
@@ -23,3 +23,5 @@ Reference the overridden block:
 	<? endblock() ?>
 	
 more docs/examples to come...
+
+(works in PHP version >= 4.3)

@@ -4,7 +4,7 @@ Basic inheritance. Notice block order doesn't matter.
 
 --FILE--
 
-<? require_once '../src/templateblocks.php' ?>
+<? require_once '../src/templateinheritance.php' ?>
 <? include 'templates/base.php' ?>
 
 <? startblock('content') ?>

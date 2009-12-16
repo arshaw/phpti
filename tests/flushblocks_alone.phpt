@@ -5,7 +5,7 @@ flushblocks can be called when there are no blocks, just won't do anything
 --FILE--
 
 <?
-require_once '../src/templateblocks.php';
+require_once '../src/templateinheritance.php';
 echo "here1";
 flushblocks();
 echo "here2";

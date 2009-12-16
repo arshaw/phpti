@@ -4,7 +4,7 @@ orphan endblock and dangling startblock in a base template
 
 --FILE--
 
-<? require_once '../src/templateblocks.php' ?>
+<? require_once '../src/templateinheritance.php' ?>
 <? include 'templates/base_broken.php' ?>
 
 <? startblock('content') ?>

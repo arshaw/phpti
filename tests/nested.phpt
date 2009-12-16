@@ -4,7 +4,7 @@ nested blocks
 
 --FILE--
 
-<? require_once '../src/templateblocks.php' ?>
+<? require_once '../src/templateinheritance.php' ?>
 <? include 'templates/3col.php' ?>
 
 <? startblock('left') ?>

@@ -8,11 +8,11 @@
 <body>
 <div id='header'>
 <h1>
-<? block('title') ?>
+<? emptyblock('title') ?>
 </h1>
 </div>
 <div id='content'>
-<? block('content') ?>
+<? emptyblock('content') ?>
 </div>
 <div id='footer'>
 <? startblock('footer') ?>

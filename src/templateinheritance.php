@@ -4,300 +4,346 @@
 // Dual licensed under the MIT and GPL licenses (MIT-LICENSE.txt and GPL-LICENSE.txt)
 
 
-
 //require_once dirname(__FILE__) . '/debug.php';
 
 
-
-$GLOBALS['_HTML_Template_Inheritance_base'] = null;
-$GLOBALS['_HTML_Template_Inheritance_stack'] = null;
-$GLOBALS['_HTML_Template_Inheritance_hash'] = null;
+$GLOBALS['_TemplateInheritance_base'] = null;
+$GLOBALS['_TemplateInheritance_stack'] = null;
 
 
+// TODO: non-existant filter function should fail gracefully
+// TODO: add tests
+// - filtered superblock
+// - endblock with optional name
+// - zeroblocks
+// - getsuperblock
 
-function block($name, $content='') {
-	HTML_Template_Inheritance::registerBlock(array(
-		'name' => $name,
-		'content' => $content
-	));
+
+function emptyblock($name) {
+	_TemplateInheritance_init();
+	_TemplateInheritance_insertBlock(
+		_TemplateInheritance_newBlock($name)
+	);
 }
 
 
-function startblock($name, $filters=array()) {
-	if ($filters) {
-		if (is_string($filters)) {
-			$filters = explode('|', $filters);
-		}
-		else if (!is_array($filters)) {
-			$filters = array($filters);
-		}
-	}else{
-		$filters = array();
-	}
-	$GLOBALS['_HTML_Template_Inheritance_stack'][] =&
-		HTML_Template_Inheritance::registerBlock(array(
-			'name' => $name,
-			'filters' => $filters
-		));
-	ob_start(array('HTML_Template_Inheritance', 'nestedBufferCallback'));
+function startblock($name, $filters=null) {
+	_TemplateInheritance_init();
+	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+	$stack[] = _TemplateInheritance_newBlock($name, $filters);
 }
 
 
-function endblock() {
-	$stack =& $GLOBALS['_HTML_Template_Inheritance_stack'];
+function endblock($name=null) {
+	_TemplateInheritance_init();
+	$stack =& $GLOBALS['_TemplateInheritance_stack'];
 	if ($stack) {
-		$block =& $stack[count($stack)-1]; // would use end(), but can't do references
-		$block['content'] = ob_get_contents();
-		ob_end_clean(); // will trigger nestedBufferCallback
+		$block = array_pop($stack);
+		if ($name && $name != $block['name']) {
+			_TemplateInheritance_warning("orphan endblock('$name')");
+		}else{
+			_TemplateInheritance_insertBlock($block);
+		}
 	}else{
-		HTML_Template_Inheritance::triggerWarning("orphan endblock()");
+		_TemplateInheritance_warning(
+			$name ? "orphan endblock('$name')" : "orphan endblock()"
+		);
 	}
 }
 
 
 function superblock() {
-	$stack = $GLOBALS['_HTML_Template_Inheritance_stack'];
+	if ($GLOBALS['_TemplateInheritance_stack']) {
+		echo getsuperblock();
+	}else{
+		_TemplateInheritance_warning('superblock() call must be within a block');
+	}
+}
+
+
+function getsuperblock() {
+	$stack =& $GLOBALS['_TemplateInheritance_stack'];
 	if ($stack) {
+		$hash =& $GLOBALS['_TemplateInheritance_hash'];
 		$block = end($stack);
-		if (isset($block['super'])) {
-			return HTML_Template_Inheritance::compileBlock($block['super']);
+		if (isset($hash[$block['name']])) {
+			return implode(
+				_TemplateInheritance_compile(
+					$hash[$block['name']]['block'],
+					ob_get_contents()
+				)
+			);
 		}
 	}else{
-		HTML_Template_Inheritance::triggerWarning('superblock() call must be within a block');
+		_TemplateInheritance_warning('getsuperblock() call must be within a block');
 	}
+	return '';
 }
 
 
 function flushblocks() {
-	$base =& $GLOBALS['_HTML_Template_Inheritance_base'];
-	$stack =& $GLOBALS['_HTML_Template_Inheritance_stack'];
+	$base =& $GLOBALS['_TemplateInheritance_base'];
 	if ($base) {
-		while ($stack) {
-			ob_end_clean(); // will trigger nestedBufferCallback
+		$stack =& $GLOBALS['_TemplateInheritance_stack'];
+		$level =& $GLOBALS['_TemplateInheritance_level'];
+		while ($block = array_pop($stack)) {
+			_TemplateInheritance_warning(
+				"missing endblock() for startblock('{$block['name']}')",
+				$block['trace']
+			);
 		}
-		$output = HTML_Template_Inheritance::compileBase(ob_get_contents());
+		while (ob_get_level() > $level) {
+			ob_end_flush(); // will eventually trigger bufferCallback
+		}
 		$base = null;
-		ob_end_clean(); // will trigger finalBufferCallback
-		echo $output;
+		$stack = null;
 	}
 }
 
 
+function zeroblocks() {
+	_TemplateInheritance_init();
+	_TemplateInheritance_cleanStack();
+}
 
 
+function _TemplateInheritance_init() {
+	$base =& $GLOBALS['_TemplateInheritance_base'];
+	if ($base && !_TemplateInheritance_inBaseOrChild()) {
+		flushblocks(); // will set $base to null
+	}
+	if (!$base) {
+		$base = array(
+			'trace' => _TemplateInheritance_callingTrace(),
+			'filters' => null, // purely for compile
+			'children' => array(),
+			'start' => 0, // purely for compile
+			'end' => null
+		);
+		$GLOBALS['_TemplateInheritance_level'] = ob_get_level();
+		$GLOBALS['_TemplateInheritance_stack'] = array();
+		$GLOBALS['_TemplateInheritance_hash'] = array();
+		$GLOBALS['_TemplateInheritance_end'] = null;
+		$GLOBALS['_TemplateInheritance_after'] = '';
+		ob_start('_TemplateInheritance_bufferCallback');
+	}
+}
 
-class HTML_Template_Inheritance {
 
-
-	function init() {
-		$base =& $GLOBALS['_HTML_Template_Inheritance_base'];
-		if ($base && !HTML_Template_Inheritance::inBaseOrChildTemplate()) {
-			flushblocks();
+function _TemplateInheritance_newBlock($name, $filters=null) {
+	$base =& $GLOBALS['_TemplateInheritance_base'];
+	$calling_trace = _TemplateInheritance_callingTrace();
+	_TemplateInheritance_cleanStack($calling_trace);
+	if ($base['end'] === null && !_TemplateInheritance_inBase($calling_trace)) {
+		$base['end'] = ob_get_length();
+	}
+	if ($filters) {
+		if (is_string($filters)) {
+			$filters = preg_split('/\s*[,|]\s*/', trim($filters));
 		}
-		if (!$base) {
-			$base = array(
-				'trace' => HTML_Template_Inheritance::callingTrace(),
-				'children' => array(),
-				'after' => ''
-			);
-			$GLOBALS['_HTML_Template_Inheritance_stack'] = array();
-			$GLOBALS['_HTML_Template_Inheritance_hash'] = array();
-			ob_start(array('HTML_Template_Inheritance', 'finalBufferCallback'));
+		else if (!is_array($filters)) {
+			$filters = array($filters);
 		}
 	}
-	
-	
-	function &registerBlock($block) {
-		HTML_Template_Inheritance::init();
-		$base =& $GLOBALS['_HTML_Template_Inheritance_base'];
-		$stack =& $GLOBALS['_HTML_Template_Inheritance_stack'];
-		$hash =& $GLOBALS['_HTML_Template_Inheritance_hash'];
-		$calling_trace = HTML_Template_Inheritance::callingTrace();
-		while ($b = end($stack)) {
-			if (HTML_Template_Inheritance::isSameFile($b['trace'], $calling_trace)) {
-				break;
-			}else{
-				endblock(); // will pop a block off the stack
-				HTML_Template_Inheritance::triggerWarning("missing endblock() for startblock('" . addslashes($b['name']) . "')", $b['trace']);
-			}
-		}
-		$name = $block['name'];
-		$block['trace'] = $calling_trace;
-		$block['offset'] = ob_get_length();
-		$block['children'] = array();
-		if ($stack || HTML_Template_Inheritance::inBaseTemplate()) {
-			// block is a nested block OR part of the base
-			// insert it as a child, and store its location in the hash
-			if ($stack) {
-				$parent =& $stack[count($stack)-1]; // would use end(), but can't do references
-			}else{
-				$parent =& $base;
-			}
-			$pinpoint = array(
-				'siblings' => &$parent['children'],
-				'index' => count($parent['children'])
-			);
-			if (isset($hash[$name])) {
-				$hash[$name][] = $pinpoint;
-			}else{
-				$hash[$name] = array($pinpoint);
-			}
-			$parent['children'][] =& $block;
+	return array(
+		'name' => $name,
+		'trace' => $calling_trace,
+		'filters' => $filters,
+		'children' => array(),
+		'start' => ob_get_length()
+	);
+}
+
+
+function _TemplateInheritance_insertBlock($block) { // at this point, $block is done being modified
+	$base =& $GLOBALS['_TemplateInheritance_base'];
+	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+	$hash =& $GLOBALS['_TemplateInheritance_hash'];
+	$end =& $GLOBALS['_TemplateInheritance_end'];
+	$block['end'] = $end = ob_get_length();
+	$name = $block['name'];
+	if ($stack || _TemplateInheritance_inBase($block['trace'])) {
+		$block_anchor = array(
+			'start' => $block['start'],
+			'end' => $end,
+			'block' => $block
+		);
+		if ($stack) {
+			// nested block
+			$stack[count($stack)-1]['children'][] =& $block_anchor;
 		}else{
-			if (!isset($base['cutoff'])) {
-				$base['cutoff'] = ob_get_length(); // base is done, record cutoff
-			}
-			// block is top-level, but not part of the base
-			// override any existing blocks with same name
-			if (isset($hash[$name])) {
-				foreach ($hash[$name] as $loc) {
-					$super =& $loc['siblings'][$loc['index']];
-					$block['offset'] = $super['offset'];
-					$loc['siblings'][$loc['index']] =& $block;
-				}
-				$block['super'] =& $super;
-			}
+			// top-level block in base
+			$base['children'][] =& $block_anchor;
 		}
-		return $block;
+		$hash[$name] =& $block_anchor; // same reference as children array
 	}
-	
-	
-	function triggerWarning($message, $trace=null) {
-		if (error_reporting() & E_USER_WARNING) {
-			if (!$trace) {
-				$trace = HTML_Template_Inheritance::callingTrace();
-			}
-			$loc = $trace[0];
-			if (defined('STDIN')) {
-				// from command line
-				$format = "\nWarning: %s in %s on line %d\n";
-			}else{
-				// from browser
-				$format = "<br />\n<b>Warning</b>:  %s in <b>%s</b> on line <b>%d</b><br />\n";
-			}
-			$s = sprintf($format, $message, $loc['file'], $loc['line']);
-			$base =& $GLOBALS['_HTML_Template_Inheritance_base'];
-			if (!$base || HTML_Template_Inheritance::inBaseTemplate()) {
-				echo $s;
-			}else{
-				$base['after'] .= $s;
-			}
+	else if (isset($hash[$name])) {
+		if (_TemplateInheritance_isSameFile($hash[$name]['block']['trace'], $block['trace'])) {
+			_TemplateInheritance_warning("cannot define another block called '$name'", $block['trace']);
+		}else{
+			// top-level block in a child template; override the base's block
+			$hash[$name]['block'] = $block;
 		}
 	}
-	
-	
-	function nestedBufferCallback($content) {
-		$stack =& $GLOBALS['_HTML_Template_Inheritance_stack'];
-		$block =& $stack[count($stack)-1]; // would use array_pop() or end(), but doesn't work with references
-		array_pop($stack);
-		if (!isset($block['content'])) {
-			$block['content'] = $content;
-			HTML_Template_Inheritance::triggerWarning("missing endblock() for startblock('" . addslashes($block['name']) . "')", $block['trace']);
+}
+
+
+function _TemplateInheritance_bufferCallback($buffer) {
+	$base =& $GLOBALS['_TemplateInheritance_base'];
+	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+	$end =& $GLOBALS['_TemplateInheritance_end'];
+	$after =& $GLOBALS['_TemplateInheritance_after'];
+	if ($base) {
+		while ($block = array_pop($stack)) {
+			_TemplateInheritance_insertBlock($block);
+			_TemplateInheritance_warning(
+				"missing endblock() for startblock('{$block['name']}')",
+				$block['trace']
+			);
 		}
+		if ($base['end'] === null) {
+			$base['end'] = strlen($buffer);
+			// means there were no blocks other than the base's
+		}
+		$parts = _TemplateInheritance_compile($base, $buffer);
+		// remove trailing whitespace from end of base
+		$i = count($parts) - 1;
+		$parts[$i] = rtrim($parts[$i]);
+		// if there are child templates blocks, preserve output after last one
+		if ($end !== null) {
+			$parts[] = substr($buffer, $end);
+		}
+		// for error messages
+		$parts[] = $after;
+		return implode($parts);
+	}else{
 		return '';
 	}
-	
-	
-	function finalBufferCallback($content) {
-		if ($GLOBALS['_HTML_Template_Inheritance_base']) {
-			return HTML_Template_Inheritance::compileBase($content);
-		}else{
-			return '';
-		}
-	}
-	
-	
-	function compileBase($content) {
-		$base =& $GLOBALS['_HTML_Template_Inheritance_base'];
-		if (isset($base['cutoff'])) {
-			$content = rtrim(substr($content, 0, $base['cutoff'])) . $base['after'] . ltrim(substr($content, $base['cutoff']));
-		}else{
-			$content .= $base['after'];
-		}
-		$base['content'] = $content;
-		return HTML_Template_Inheritance::compileBlock($base);
-	}
-	
-	
-	function compileBlock($block) {
-		$parts = array();
-		$content = $block['content'];
-		if (isset($block['filters'])) {
-			foreach ($block['filters'] as $filter) {
-				$content = call_user_func($filter, $content);
-			}
-		}
-		$prev_offset = 0;
-		foreach ($block['children'] as $child) {
-			$offset = $child['offset'];
-			$parts[] = substr($content, $prev_offset, $offset - $prev_offset);
-			$parts[] = HTML_Template_Inheritance::compileBlock($child);
-			$prev_offset = $offset;
-		}
-		$parts[] = substr($content, $prev_offset);
-		return implode($parts);
-	}
-	
-	
-	
-	
-	
-	
-	/* backtrace utilities
-	------------------------------------------------------------------------*/
-	
-	
-	function inBaseTemplate() {
-		return HTML_Template_Inheritance::isSameFile(
-			HTML_Template_Inheritance::callingTrace(),
-			$GLOBALS['_HTML_Template_Inheritance_base']['trace']
+}
+
+
+function _TemplateInheritance_compile($block, $buffer) {
+	$parts = array();
+	$previ = $block['start'];
+	foreach ($block['children'] as $child_anchor) {
+		$parts[] = substr($buffer, $previ, $child_anchor['start'] - $previ);
+		$parts = array_merge(
+			$parts,
+			_TemplateInheritance_compile($child_anchor['block'], $buffer)
 		);
+		$previ = $child_anchor['end'];
 	}
-	
-	
-	function inBaseOrChildTemplate() {
-		$calling_trace = HTML_Template_Inheritance::callingTrace();
-		$base_trace = $GLOBALS['_HTML_Template_Inheritance_base']['trace'];
-		return
-			$calling_trace && $base_trace &&
-			HTML_Template_Inheritance::isSubtrace(array_slice($calling_trace, 1), $base_trace) &&
-			$calling_trace[0]['file'] === $base_trace[count($base_trace)-count($calling_trace)]['file'];
+	if ($previ != $block['end']) {
+		// could be a big buffer, so only do substr if necessary
+		$parts[] = substr($buffer, $previ, $block['end'] - $previ);
 	}
-	
-	
-	function callingTrace() {
-		$trace = debug_backtrace();
-		foreach ($trace as $i => $location) {
-			if ($location['file'] !== __FILE__) {
-				return array_slice($trace, $i);
-			}
+	if ($block['filters']) {
+		$s = implode($parts);
+		foreach ($block['filters'] as $filter) {
+			$s = call_user_func($filter, $s);
+		}
+		return array($s);
+	}
+	return $parts;
+}
+
+
+function _TemplateInheritance_cleanStack($trace=null) {
+	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+	if (!$trace) {
+		$trace = _TemplateInheritance_callingTrace();
+	}
+	while ($block = end($stack)) {
+		if (_TemplateInheritance_isSameFile($block['trace'], $trace)) {
+			break;
+		}else{
+			array_pop($stack);
+			_TemplateInheritance_insertBlock($block);
+			_TemplateInheritance_warning(
+				"missing endblock() for startblock('{$block['name']}')",
+				$block['trace']
+			);
 		}
 	}
-	
-	
-	function isSameFile($trace1, $trace2) {
-		return
-			$trace1 && $trace2 &&
-			$trace1[0]['file'] === $trace2[0]['file'] &&
-			array_slice($trace1, 1) === array_slice($trace2, 1);
+}
+
+
+function _TemplateInheritance_warning($message, $trace=null) {
+	if (error_reporting() & E_USER_WARNING) {
+		if (!$trace) {
+			$trace = _TemplateInheritance_callingTrace();
+		}
+		if (defined('STDIN')) {
+			// from command line
+			$format = "\nWarning: %s in %s on line %d\n";
+		}else{
+			// from browser
+			$format = "<br />\n<b>Warning</b>:  %s in <b>%s</b> on line <b>%d</b><br />\n";
+		}
+		$s = sprintf($format, $message, $trace[0]['file'], $trace[0]['line']);
+		if (!$GLOBALS['_TemplateInheritance_base'] || _TemplateInheritance_inBase()) {
+			echo $s;
+		}else{
+			$GLOBALS['_TemplateInheritance_after'] .= $s;
+		}
 	}
-	
-	
-	function isSubtrace($trace1, $trace2) { // is trace1 a subtrace of trace2
-		$len1 = count($trace1);
-		$len2 = count($trace2);
-		if ($len1 > $len2) {
+}
+
+
+/* backtrace utilities
+------------------------------------------------------------------------*/
+
+
+function _TemplateInheritance_inBase($trace=null) {
+	if (!$trace) {
+		$trace = _TemplateInheritance_callingTrace();
+	}
+	return _TemplateInheritance_isSameFile($trace, $GLOBALS['_TemplateInheritance_base']['trace']);
+}
+
+
+function _TemplateInheritance_inBaseOrChild($trace=null) {
+	if (!$trace) {
+		$trace = _TemplateInheritance_callingTrace();
+	}
+	$base_trace = $GLOBALS['_TemplateInheritance_base']['trace'];
+	return
+		$trace && $base_trace &&
+		_TemplateInheritance_isSubtrace(array_slice($trace, 1), $base_trace) &&
+		$trace[0]['file'] === $base_trace[count($base_trace)-count($trace)]['file'];
+}
+
+
+function _TemplateInheritance_callingTrace() {
+	$trace = debug_backtrace();
+	foreach ($trace as $i => $location) {
+		if ($location['file'] !== __FILE__) {
+			return array_slice($trace, $i);
+		}
+	}
+}
+
+
+function _TemplateInheritance_isSameFile($trace1, $trace2) {
+	return
+		$trace1 && $trace2 &&
+		$trace1[0]['file'] === $trace2[0]['file'] &&
+		array_slice($trace1, 1) === array_slice($trace2, 1);
+}
+
+
+function _TemplateInheritance_isSubtrace($trace1, $trace2) { // is trace1 a subtrace of trace2
+	$len1 = count($trace1);
+	$len2 = count($trace2);
+	if ($len1 > $len2) {
+		return false;
+	}
+	for ($i=0; $i<$len1; $i++) {
+		if ($trace1[$len1-1-$i] !== $trace2[$len2-1-$i]) {
 			return false;
 		}
-		for ($i=0; $i<$len1; $i++) {
-			if ($trace1[$len1-1-$i] !== $trace2[$len2-1-$i]) {
-				return false;
-			}
-		}
-		return true;
 	}
-	
-
+	return true;
 }
 
 

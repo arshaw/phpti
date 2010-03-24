@@ -19,7 +19,7 @@ Define an empty block:
 Reference the overridden block:
 
 	<? startblock('footer') ?>
-	<?= superblock() ?> - Copyright 2009
+	<? superblock() ?> - Copyright 2009
 	<? endblock() ?>
 	
 more docs/examples to come...

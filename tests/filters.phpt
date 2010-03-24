@@ -8,6 +8,8 @@ test the filter argument of startblock, with filters as a string and array
 require_once '../src/templateinheritance.php';
 include 'templates/base.php';
 
+// TODO: test for commas and spaces in filter string
+
 function filter1($s) {
 	return '*' . trim($s) . '*';
 }

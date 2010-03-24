@@ -9,7 +9,7 @@ superblock function, before/after/inside content, blocks in different order, whe
 
 <? startblock('footer') ?>
 Copyright 2009
-<?= superblock() ?>
+<? superblock() ?>
 <? endblock() ?>
 
 <? startblock('title') ?>
@@ -19,7 +19,7 @@ the page title
 
 <? startblock('head') ?>
 <link rel='stylesheet' type='text/css' href='something.css' />
-<?= superblock() ?>
+<? superblock() ?>
 <script type='text/javascript' src='something.js'></script>
 <? endblock() ?>
 

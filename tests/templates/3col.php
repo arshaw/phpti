@@ -2,12 +2,12 @@
 
 <? startblock('content') ?>
 <div id='left'>
-<? block('left') ?>
+<? emptyblock('left') ?>
 </div>
 <div id='center'>
-<? block('center') ?>
+<? emptyblock('center') ?>
 </div>
 <div id='right'>
-<? block('right') ?>
+<? emptyblock('right') ?>
 </div>
 <? endblock() ?>

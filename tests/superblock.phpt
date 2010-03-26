@@ -13,7 +13,7 @@ Copyright 2009
 <? endblock() ?>
 
 <? startblock('title') ?>
-<?= superblock() ?>
+<? superblock() ?>
 the page title
 <? endblock() ?>
 

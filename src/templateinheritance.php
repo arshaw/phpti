@@ -11,42 +11,45 @@ $GLOBALS['_TemplateInheritance_base'] = null;
 $GLOBALS['_TemplateInheritance_stack'] = null;
 
 
-// TODO: non-existant filter function should fail gracefully
+// TODO: whitespace on same line as block
 // TODO: add tests
 // - filtered superblock
 // - endblock with optional name
-// - zeroblocks
-// - getsuperblock
+// - blockbase
 
 
 function emptyblock($name) {
-	_TemplateInheritance_init();
+	$trace = _TemplateInheritance_trace();
+	_TemplateInheritance_init($trace);
 	_TemplateInheritance_insertBlock(
-		_TemplateInheritance_newBlock($name)
+		_TemplateInheritance_newBlock($name, null, $trace)
 	);
 }
 
 
 function startblock($name, $filters=null) {
-	_TemplateInheritance_init();
+	$trace = _TemplateInheritance_trace();
+	_TemplateInheritance_init($trace);
 	$stack =& $GLOBALS['_TemplateInheritance_stack'];
-	$stack[] = _TemplateInheritance_newBlock($name, $filters);
+	$stack[] = _TemplateInheritance_newBlock($name, $filters, $trace);
 }
 
 
 function endblock($name=null) {
-	_TemplateInheritance_init();
+	$trace = _TemplateInheritance_trace();
+	_TemplateInheritance_init($trace);
 	$stack =& $GLOBALS['_TemplateInheritance_stack'];
 	if ($stack) {
 		$block = array_pop($stack);
 		if ($name && $name != $block['name']) {
-			_TemplateInheritance_warning("orphan endblock('$name')");
+			_TemplateInheritance_warning("orphan endblock('$name')", $trace);
 		}else{
 			_TemplateInheritance_insertBlock($block);
 		}
 	}else{
 		_TemplateInheritance_warning(
-			$name ? "orphan endblock('$name')" : "orphan endblock()"
+			$name ? "orphan endblock('$name')" : "orphan endblock()",
+			$trace
 		);
 	}
 }
@@ -56,7 +59,10 @@ function superblock() {
 	if ($GLOBALS['_TemplateInheritance_stack']) {
 		echo getsuperblock();
 	}else{
-		_TemplateInheritance_warning('superblock() call must be within a block');
+		_TemplateInheritance_warning(
+			"superblock() call must be within a block",
+			_TemplateInheritance_trace()
+		);
 	}
 }
 
@@ -75,7 +81,10 @@ function getsuperblock() {
 			);
 		}
 	}else{
-		_TemplateInheritance_warning('getsuperblock() call must be within a block');
+		_TemplateInheritance_warning(
+			"getsuperblock() call must be within a block",
+			_TemplateInheritance_trace()
+		);
 	}
 	return '';
 }
@@ -89,6 +98,7 @@ function flushblocks() {
 		while ($block = array_pop($stack)) {
 			_TemplateInheritance_warning(
 				"missing endblock() for startblock('{$block['name']}')",
+				_TemplateInheritance_trace(),
 				$block['trace']
 			);
 		}
@@ -101,20 +111,21 @@ function flushblocks() {
 }
 
 
-function zeroblocks() {
-	_TemplateInheritance_init();
-	_TemplateInheritance_cleanStack();
+function blockbase() {
+	_TemplateInheritance_init(
+		_TemplateInheritance_trace()
+	);
 }
 
 
-function _TemplateInheritance_init() {
+function _TemplateInheritance_init($trace) {
 	$base =& $GLOBALS['_TemplateInheritance_base'];
-	if ($base && !_TemplateInheritance_inBaseOrChild()) {
+	if ($base && !_TemplateInheritance_inBaseOrChild($trace)) {
 		flushblocks(); // will set $base to null
 	}
 	if (!$base) {
 		$base = array(
-			'trace' => _TemplateInheritance_callingTrace(),
+			'trace' => $trace,
 			'filters' => null, // purely for compile
 			'children' => array(),
 			'start' => 0, // purely for compile
@@ -130,11 +141,23 @@ function _TemplateInheritance_init() {
 }
 
 
-function _TemplateInheritance_newBlock($name, $filters=null) {
+function _TemplateInheritance_newBlock($name, $filters, $trace) {
 	$base =& $GLOBALS['_TemplateInheritance_base'];
-	$calling_trace = _TemplateInheritance_callingTrace();
-	_TemplateInheritance_cleanStack($calling_trace);
-	if ($base['end'] === null && !_TemplateInheritance_inBase($calling_trace)) {
+	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+	while ($block = end($stack)) {
+		if (_TemplateInheritance_isSameFile($block['trace'], $trace)) {
+			break;
+		}else{
+			array_pop($stack);
+			_TemplateInheritance_insertBlock($block);
+			_TemplateInheritance_warning(
+				"missing endblock() for startblock('{$block['name']}')",
+				_TemplateInheritance_trace(),
+				$block['trace']
+			);
+		}
+	}
+	if ($base['end'] === null && !_TemplateInheritance_inBase($trace)) {
 		$base['end'] = ob_get_length();
 	}
 	if ($filters) {
@@ -144,10 +167,19 @@ function _TemplateInheritance_newBlock($name, $filters=null) {
 		else if (!is_array($filters)) {
 			$filters = array($filters);
 		}
+		foreach ($filters as $i => $f) {
+			if ($f && is_string($f) && !function_exists($f)) {
+				_TemplateInheritance_warning(
+					"filter '$f' is not defined",
+					$trace
+				);
+				$filters[$i] = null;
+			}
+		}
 	}
 	return array(
 		'name' => $name,
-		'trace' => $calling_trace,
+		'trace' => $trace,
 		'filters' => $filters,
 		'children' => array(),
 		'start' => ob_get_length()
@@ -179,7 +211,11 @@ function _TemplateInheritance_insertBlock($block) { // at this point, $block is 
 	}
 	else if (isset($hash[$name])) {
 		if (_TemplateInheritance_isSameFile($hash[$name]['block']['trace'], $block['trace'])) {
-			_TemplateInheritance_warning("cannot define another block called '$name'", $block['trace']);
+			_TemplateInheritance_warning(
+				"cannot define another block called '$name'",
+				_TemplateInheritance_trace(),
+				$block['trace']
+			);
 		}else{
 			// top-level block in a child template; override the base's block
 			$hash[$name]['block'] = $block;
@@ -198,18 +234,20 @@ function _TemplateInheritance_bufferCallback($buffer) {
 			_TemplateInheritance_insertBlock($block);
 			_TemplateInheritance_warning(
 				"missing endblock() for startblock('{$block['name']}')",
+				_TemplateInheritance_trace(),
 				$block['trace']
 			);
 		}
 		if ($base['end'] === null) {
 			$base['end'] = strlen($buffer);
+			$end = null; // todo: more explanation
 			// means there were no blocks other than the base's
 		}
 		$parts = _TemplateInheritance_compile($base, $buffer);
-		// remove trailing whitespace from end of base
+		// remove trailing whitespace from end
 		$i = count($parts) - 1;
 		$parts[$i] = rtrim($parts[$i]);
-		// if there are child templates blocks, preserve output after last one
+		// if there are child template blocks, preserve output after last one
 		if ($end !== null) {
 			$parts[] = substr($buffer, $end);
 		}
@@ -240,7 +278,9 @@ function _TemplateInheritance_compile($block, $buffer) {
 	if ($block['filters']) {
 		$s = implode($parts);
 		foreach ($block['filters'] as $filter) {
-			$s = call_user_func($filter, $s);
+			if ($filter) {
+				$s = call_user_func($filter, $s);
+			}
 		}
 		return array($s);
 	}
@@ -248,31 +288,8 @@ function _TemplateInheritance_compile($block, $buffer) {
 }
 
 
-function _TemplateInheritance_cleanStack($trace=null) {
-	$stack =& $GLOBALS['_TemplateInheritance_stack'];
-	if (!$trace) {
-		$trace = _TemplateInheritance_callingTrace();
-	}
-	while ($block = end($stack)) {
-		if (_TemplateInheritance_isSameFile($block['trace'], $trace)) {
-			break;
-		}else{
-			array_pop($stack);
-			_TemplateInheritance_insertBlock($block);
-			_TemplateInheritance_warning(
-				"missing endblock() for startblock('{$block['name']}')",
-				$block['trace']
-			);
-		}
-	}
-}
-
-
-function _TemplateInheritance_warning($message, $trace=null) {
+function _TemplateInheritance_warning($message, $trace, $warning_trace=null) {
 	if (error_reporting() & E_USER_WARNING) {
-		if (!$trace) {
-			$trace = _TemplateInheritance_callingTrace();
-		}
 		if (defined('STDIN')) {
 			// from command line
 			$format = "\nWarning: %s in %s on line %d\n";
@@ -280,8 +297,11 @@ function _TemplateInheritance_warning($message, $trace=null) {
 			// from browser
 			$format = "<br />\n<b>Warning</b>:  %s in <b>%s</b> on line <b>%d</b><br />\n";
 		}
-		$s = sprintf($format, $message, $trace[0]['file'], $trace[0]['line']);
-		if (!$GLOBALS['_TemplateInheritance_base'] || _TemplateInheritance_inBase()) {
+		if (!$warning_trace) {
+			$warning_trace = $trace;
+		}
+		$s = sprintf($format, $message, $warning_trace[0]['file'], $warning_trace[0]['line']);
+		if (!$GLOBALS['_TemplateInheritance_base'] || _TemplateInheritance_inBase($trace)) {
 			echo $s;
 		}else{
 			$GLOBALS['_TemplateInheritance_after'] .= $s;
@@ -294,33 +314,27 @@ function _TemplateInheritance_warning($message, $trace=null) {
 ------------------------------------------------------------------------*/
 
 
-function _TemplateInheritance_inBase($trace=null) {
-	if (!$trace) {
-		$trace = _TemplateInheritance_callingTrace();
-	}
-	return _TemplateInheritance_isSameFile($trace, $GLOBALS['_TemplateInheritance_base']['trace']);
-}
-
-
-function _TemplateInheritance_inBaseOrChild($trace=null) {
-	if (!$trace) {
-		$trace = _TemplateInheritance_callingTrace();
-	}
-	$base_trace = $GLOBALS['_TemplateInheritance_base']['trace'];
-	return
-		$trace && $base_trace &&
-		_TemplateInheritance_isSubtrace(array_slice($trace, 1), $base_trace) &&
-		$trace[0]['file'] === $base_trace[count($base_trace)-count($trace)]['file'];
-}
-
-
-function _TemplateInheritance_callingTrace() {
+function _TemplateInheritance_trace() {
 	$trace = debug_backtrace();
 	foreach ($trace as $i => $location) {
 		if ($location['file'] !== __FILE__) {
 			return array_slice($trace, $i);
 		}
 	}
+}
+
+
+function _TemplateInheritance_inBase($trace) {
+	return _TemplateInheritance_isSameFile($trace, $GLOBALS['_TemplateInheritance_base']['trace']);
+}
+
+
+function _TemplateInheritance_inBaseOrChild($trace) {
+	$base_trace = $GLOBALS['_TemplateInheritance_base']['trace'];
+	return
+		$trace && $base_trace &&
+		_TemplateInheritance_isSubtrace(array_slice($trace, 1), $base_trace) &&
+		$trace[0]['file'] === $base_trace[count($base_trace)-count($trace)]['file'];
 }
 
 

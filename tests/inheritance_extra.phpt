@@ -4,7 +4,7 @@ extra block
 
 --FILE--
 
-<? require_once '../src/templateinheritance.php' ?>
+<? require_once '../src/ti.php' ?>
 <? include 'templates/base.php' ?>
 
 <? startblock('content') ?>

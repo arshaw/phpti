@@ -7,47 +7,40 @@
 //require_once dirname(__FILE__) . '/debug.php';
 
 
-$GLOBALS['_TemplateInheritance_base'] = null;
-$GLOBALS['_TemplateInheritance_stack'] = null;
-
-
-// TODO: whitespace on same line as block
-// TODO: add tests
-// - filtered superblock
-// - endblock with optional name
-// - blockbase
+$GLOBALS['_ti_base'] = null;
+$GLOBALS['_ti_stack'] = null;
 
 
 function emptyblock($name) {
-	$trace = _TemplateInheritance_trace();
-	_TemplateInheritance_init($trace);
-	_TemplateInheritance_insertBlock(
-		_TemplateInheritance_newBlock($name, null, $trace)
+	$trace = _ti_callingTrace();
+	_ti_init($trace);
+	_ti_insertBlock(
+		_ti_newBlock($name, null, $trace)
 	);
 }
 
 
 function startblock($name, $filters=null) {
-	$trace = _TemplateInheritance_trace();
-	_TemplateInheritance_init($trace);
-	$stack =& $GLOBALS['_TemplateInheritance_stack'];
-	$stack[] = _TemplateInheritance_newBlock($name, $filters, $trace);
+	$trace = _ti_callingTrace();
+	_ti_init($trace);
+	$stack =& $GLOBALS['_ti_stack'];
+	$stack[] = _ti_newBlock($name, $filters, $trace);
 }
 
 
 function endblock($name=null) {
-	$trace = _TemplateInheritance_trace();
-	_TemplateInheritance_init($trace);
-	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+	$trace = _ti_callingTrace();
+	_ti_init($trace);
+	$stack =& $GLOBALS['_ti_stack'];
 	if ($stack) {
 		$block = array_pop($stack);
 		if ($name && $name != $block['name']) {
-			_TemplateInheritance_warning("orphan endblock('$name')", $trace);
+			_ti_warning("orphan endblock('$name')", $trace);
 		}else{
-			_TemplateInheritance_insertBlock($block);
+			_ti_insertBlock($block);
 		}
 	}else{
-		_TemplateInheritance_warning(
+		_ti_warning(
 			$name ? "orphan endblock('$name')" : "orphan endblock()",
 			$trace
 		);
@@ -56,34 +49,34 @@ function endblock($name=null) {
 
 
 function superblock() {
-	if ($GLOBALS['_TemplateInheritance_stack']) {
+	if ($GLOBALS['_ti_stack']) {
 		echo getsuperblock();
 	}else{
-		_TemplateInheritance_warning(
+		_ti_warning(
 			"superblock() call must be within a block",
-			_TemplateInheritance_trace()
+			_ti_callingTrace()
 		);
 	}
 }
 
 
 function getsuperblock() {
-	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+	$stack =& $GLOBALS['_ti_stack'];
 	if ($stack) {
-		$hash =& $GLOBALS['_TemplateInheritance_hash'];
+		$hash =& $GLOBALS['_ti_hash'];
 		$block = end($stack);
 		if (isset($hash[$block['name']])) {
 			return implode(
-				_TemplateInheritance_compile(
+				_ti_compile(
 					$hash[$block['name']]['block'],
 					ob_get_contents()
 				)
 			);
 		}
 	}else{
-		_TemplateInheritance_warning(
+		_ti_warning(
 			"getsuperblock() call must be within a block",
-			_TemplateInheritance_trace()
+			_ti_callingTrace()
 		);
 	}
 	return '';
@@ -91,14 +84,14 @@ function getsuperblock() {
 
 
 function flushblocks() {
-	$base =& $GLOBALS['_TemplateInheritance_base'];
+	$base =& $GLOBALS['_ti_base'];
 	if ($base) {
-		$stack =& $GLOBALS['_TemplateInheritance_stack'];
-		$level =& $GLOBALS['_TemplateInheritance_level'];
+		$stack =& $GLOBALS['_ti_stack'];
+		$level =& $GLOBALS['_ti_level'];
 		while ($block = array_pop($stack)) {
-			_TemplateInheritance_warning(
+			_ti_warning(
 				"missing endblock() for startblock('{$block['name']}')",
-				_TemplateInheritance_trace(),
+				_ti_callingTrace(),
 				$block['trace']
 			);
 		}
@@ -112,15 +105,15 @@ function flushblocks() {
 
 
 function blockbase() {
-	_TemplateInheritance_init(
-		_TemplateInheritance_trace()
+	_ti_init(
+		_ti_callingTrace()
 	);
 }
 
 
-function _TemplateInheritance_init($trace) {
-	$base =& $GLOBALS['_TemplateInheritance_base'];
-	if ($base && !_TemplateInheritance_inBaseOrChild($trace)) {
+function _ti_init($trace) {
+	$base =& $GLOBALS['_ti_base'];
+	if ($base && !_ti_inBaseOrChild($trace)) {
 		flushblocks(); // will set $base to null
 	}
 	if (!$base) {
@@ -131,33 +124,33 @@ function _TemplateInheritance_init($trace) {
 			'start' => 0, // purely for compile
 			'end' => null
 		);
-		$GLOBALS['_TemplateInheritance_level'] = ob_get_level();
-		$GLOBALS['_TemplateInheritance_stack'] = array();
-		$GLOBALS['_TemplateInheritance_hash'] = array();
-		$GLOBALS['_TemplateInheritance_end'] = null;
-		$GLOBALS['_TemplateInheritance_after'] = '';
-		ob_start('_TemplateInheritance_bufferCallback');
+		$GLOBALS['_ti_level'] = ob_get_level();
+		$GLOBALS['_ti_stack'] = array();
+		$GLOBALS['_ti_hash'] = array();
+		$GLOBALS['_ti_end'] = null;
+		$GLOBALS['_ti_after'] = '';
+		ob_start('_ti_bufferCallback');
 	}
 }
 
 
-function _TemplateInheritance_newBlock($name, $filters, $trace) {
-	$base =& $GLOBALS['_TemplateInheritance_base'];
-	$stack =& $GLOBALS['_TemplateInheritance_stack'];
+function _ti_newBlock($name, $filters, $trace) {
+	$base =& $GLOBALS['_ti_base'];
+	$stack =& $GLOBALS['_ti_stack'];
 	while ($block = end($stack)) {
-		if (_TemplateInheritance_isSameFile($block['trace'], $trace)) {
+		if (_ti_isSameFile($block['trace'], $trace)) {
 			break;
 		}else{
 			array_pop($stack);
-			_TemplateInheritance_insertBlock($block);
-			_TemplateInheritance_warning(
+			_ti_insertBlock($block);
+			_ti_warning(
 				"missing endblock() for startblock('{$block['name']}')",
-				_TemplateInheritance_trace(),
+				_ti_callingTrace(),
 				$block['trace']
 			);
 		}
 	}
-	if ($base['end'] === null && !_TemplateInheritance_inBase($trace)) {
+	if ($base['end'] === null && !_ti_inBase($trace)) {
 		$base['end'] = ob_get_length();
 	}
 	if ($filters) {
@@ -169,7 +162,7 @@ function _TemplateInheritance_newBlock($name, $filters, $trace) {
 		}
 		foreach ($filters as $i => $f) {
 			if ($f && is_string($f) && !function_exists($f)) {
-				_TemplateInheritance_warning(
+				_ti_warning(
 					"filter '$f' is not defined",
 					$trace
 				);
@@ -187,14 +180,14 @@ function _TemplateInheritance_newBlock($name, $filters, $trace) {
 }
 
 
-function _TemplateInheritance_insertBlock($block) { // at this point, $block is done being modified
-	$base =& $GLOBALS['_TemplateInheritance_base'];
-	$stack =& $GLOBALS['_TemplateInheritance_stack'];
-	$hash =& $GLOBALS['_TemplateInheritance_hash'];
-	$end =& $GLOBALS['_TemplateInheritance_end'];
+function _ti_insertBlock($block) { // at this point, $block is done being modified
+	$base =& $GLOBALS['_ti_base'];
+	$stack =& $GLOBALS['_ti_stack'];
+	$hash =& $GLOBALS['_ti_hash'];
+	$end =& $GLOBALS['_ti_end'];
 	$block['end'] = $end = ob_get_length();
 	$name = $block['name'];
-	if ($stack || _TemplateInheritance_inBase($block['trace'])) {
+	if ($stack || _ti_inBase($block['trace'])) {
 		$block_anchor = array(
 			'start' => $block['start'],
 			'end' => $end,
@@ -210,10 +203,10 @@ function _TemplateInheritance_insertBlock($block) { // at this point, $block is 
 		$hash[$name] =& $block_anchor; // same reference as children array
 	}
 	else if (isset($hash[$name])) {
-		if (_TemplateInheritance_isSameFile($hash[$name]['block']['trace'], $block['trace'])) {
-			_TemplateInheritance_warning(
+		if (_ti_isSameFile($hash[$name]['block']['trace'], $block['trace'])) {
+			_ti_warning(
 				"cannot define another block called '$name'",
-				_TemplateInheritance_trace(),
+				_ti_callingTrace(),
 				$block['trace']
 			);
 		}else{
@@ -224,17 +217,17 @@ function _TemplateInheritance_insertBlock($block) { // at this point, $block is 
 }
 
 
-function _TemplateInheritance_bufferCallback($buffer) {
-	$base =& $GLOBALS['_TemplateInheritance_base'];
-	$stack =& $GLOBALS['_TemplateInheritance_stack'];
-	$end =& $GLOBALS['_TemplateInheritance_end'];
-	$after =& $GLOBALS['_TemplateInheritance_after'];
+function _ti_bufferCallback($buffer) {
+	$base =& $GLOBALS['_ti_base'];
+	$stack =& $GLOBALS['_ti_stack'];
+	$end =& $GLOBALS['_ti_end'];
+	$after =& $GLOBALS['_ti_after'];
 	if ($base) {
 		while ($block = array_pop($stack)) {
-			_TemplateInheritance_insertBlock($block);
-			_TemplateInheritance_warning(
+			_ti_insertBlock($block);
+			_ti_warning(
 				"missing endblock() for startblock('{$block['name']}')",
-				_TemplateInheritance_trace(),
+				_ti_callingTrace(),
 				$block['trace']
 			);
 		}
@@ -243,7 +236,7 @@ function _TemplateInheritance_bufferCallback($buffer) {
 			$end = null; // todo: more explanation
 			// means there were no blocks other than the base's
 		}
-		$parts = _TemplateInheritance_compile($base, $buffer);
+		$parts = _ti_compile($base, $buffer);
 		// remove trailing whitespace from end
 		$i = count($parts) - 1;
 		$parts[$i] = rtrim($parts[$i]);
@@ -260,14 +253,14 @@ function _TemplateInheritance_bufferCallback($buffer) {
 }
 
 
-function _TemplateInheritance_compile($block, $buffer) {
+function _ti_compile($block, $buffer) {
 	$parts = array();
 	$previ = $block['start'];
 	foreach ($block['children'] as $child_anchor) {
 		$parts[] = substr($buffer, $previ, $child_anchor['start'] - $previ);
 		$parts = array_merge(
 			$parts,
-			_TemplateInheritance_compile($child_anchor['block'], $buffer)
+			_ti_compile($child_anchor['block'], $buffer)
 		);
 		$previ = $child_anchor['end'];
 	}
@@ -288,7 +281,7 @@ function _TemplateInheritance_compile($block, $buffer) {
 }
 
 
-function _TemplateInheritance_warning($message, $trace, $warning_trace=null) {
+function _ti_warning($message, $trace, $warning_trace=null) {
 	if (error_reporting() & E_USER_WARNING) {
 		if (defined('STDIN')) {
 			// from command line
@@ -301,10 +294,10 @@ function _TemplateInheritance_warning($message, $trace, $warning_trace=null) {
 			$warning_trace = $trace;
 		}
 		$s = sprintf($format, $message, $warning_trace[0]['file'], $warning_trace[0]['line']);
-		if (!$GLOBALS['_TemplateInheritance_base'] || _TemplateInheritance_inBase($trace)) {
+		if (!$GLOBALS['_ti_base'] || _ti_inBase($trace)) {
 			echo $s;
 		}else{
-			$GLOBALS['_TemplateInheritance_after'] .= $s;
+			$GLOBALS['_ti_after'] .= $s;
 		}
 	}
 }
@@ -314,7 +307,7 @@ function _TemplateInheritance_warning($message, $trace, $warning_trace=null) {
 ------------------------------------------------------------------------*/
 
 
-function _TemplateInheritance_trace() {
+function _ti_callingTrace() {
 	$trace = debug_backtrace();
 	foreach ($trace as $i => $location) {
 		if ($location['file'] !== __FILE__) {
@@ -324,21 +317,21 @@ function _TemplateInheritance_trace() {
 }
 
 
-function _TemplateInheritance_inBase($trace) {
-	return _TemplateInheritance_isSameFile($trace, $GLOBALS['_TemplateInheritance_base']['trace']);
+function _ti_inBase($trace) {
+	return _ti_isSameFile($trace, $GLOBALS['_ti_base']['trace']);
 }
 
 
-function _TemplateInheritance_inBaseOrChild($trace) {
-	$base_trace = $GLOBALS['_TemplateInheritance_base']['trace'];
+function _ti_inBaseOrChild($trace) {
+	$base_trace = $GLOBALS['_ti_base']['trace'];
 	return
 		$trace && $base_trace &&
-		_TemplateInheritance_isSubtrace(array_slice($trace, 1), $base_trace) &&
+		_ti_isSubtrace(array_slice($trace, 1), $base_trace) &&
 		$trace[0]['file'] === $base_trace[count($base_trace)-count($trace)]['file'];
 }
 
 
-function _TemplateInheritance_isSameFile($trace1, $trace2) {
+function _ti_isSameFile($trace1, $trace2) {
 	return
 		$trace1 && $trace2 &&
 		$trace1[0]['file'] === $trace2[0]['file'] &&
@@ -346,7 +339,7 @@ function _TemplateInheritance_isSameFile($trace1, $trace2) {
 }
 
 
-function _TemplateInheritance_isSubtrace($trace1, $trace2) { // is trace1 a subtrace of trace2
+function _ti_isSubtrace($trace1, $trace2) { // is trace1 a subtrace of trace2
 	$len1 = count($trace1);
 	$len2 = count($trace2);
 	if ($len1 > $len2) {

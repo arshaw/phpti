@@ -6,7 +6,7 @@ Output outside of template, after template, gets sent to standard out
 
 <?php
 
-require_once '../src/templateinheritance.php';
+require_once '../src/ti.php';
 
 include 'templates/page1.php';
 

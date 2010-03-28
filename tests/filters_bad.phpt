@@ -6,7 +6,7 @@ Warns and does not execute filters that do not exist
 
 <?php
 
-require_once '../src/templateinheritance.php';
+require_once '../src/ti.php';
 include 'templates/base.php';
 
 function filter1($s) {

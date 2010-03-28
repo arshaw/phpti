@@ -4,7 +4,7 @@ Warning for nonexistant filter happens where block is defined
 
 --FILE--
 
-<? require '../src/templateinheritance.php' ?>
+<? require '../src/ti.php' ?>
 <html>
 <head>
 <? startblock('head') ?>

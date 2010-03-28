@@ -4,7 +4,7 @@ Make sure a single base template file handles the buffer correctly
 
 --FILE--
 
-<? require_once '../src/templateinheritance.php' ?>
+<? require_once '../src/ti.php' ?>
 <html>
 <head>
 <? startblock('head') ?>

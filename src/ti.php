@@ -1,7 +1,16 @@
 <?php
 
-// author: Adam Shaw
-// Dual licensed under the MIT and GPL licenses (MIT-LICENSE.txt and GPL-LICENSE.txt)
+/*
+
+PHP Template Inheritance
+------------------------
+Version: @VERSION
+Released: @DATE
+Website: http://phpti.com/
+Author: Adam Shaw (http://arshaw.com/)
+Licensed under the MIT License (license.txt)
+
+*/
 
 
 //require_once dirname(__FILE__) . '/debug.php';

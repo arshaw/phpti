@@ -4,7 +4,7 @@ Make sure a single base template file handles the buffer correctly
 
 --FILE--
 
-<? require_once '../src/ti.php' ?>
+<? require_once 'ti.php' ?>
 <html>
 <head>
 <? startblock('head') ?>

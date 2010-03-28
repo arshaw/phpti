@@ -1,37 +1,30 @@
---TEST--
+<?
 
-Output outside of template, after template, gets sent to standard out
-
---FILE--
-
-<?php
-
-require_once 'ti.php';
-
-include 'templates/page1.php';
-
-echo "this is after";
+function filter1($s) {
+	return "*" . trim($s) . "*";
+}
 
 ?>
-
---EXPECT--
-
 <html>
 <head>
+<? startblock('head') ?>
 <link rel='stylesheet' type='text/css' href='main.css' />
 <script type='text/javascript' src='main.js'></script>
+<? endblock() ?>
 </head>
 <body>
 <div id='header'>
 <h1>
-this is a cool title
+<? emptyblock('title') ?>
 </h1>
 </div>
 <div id='content'>
-thie is some cool content
+<? emptyblock('content') ?>
 </div>
 <div id='footer'>
+<? startblock('footer', 'filter1') ?>
 this is the default footer
+<? endblock() ?>
 </div>
 </body>
-</html>this is after
+</html>

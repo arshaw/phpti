@@ -4,7 +4,7 @@ superblock function, before/after/inside content, blocks in different order, whe
 
 --FILE--
 
-<? require_once '../src/ti.php' ?>
+<? require_once 'ti.php' ?>
 <? include 'templates/base.php' ?>
 
 <? startblock('footer') ?>

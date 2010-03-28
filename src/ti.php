@@ -8,12 +8,10 @@ Version: @VERSION
 Released: @DATE
 Website: http://phpti.com/
 Author: Adam Shaw (http://arshaw.com/)
-Licensed under the MIT License (license.txt)
+Released under the MIT License (license.txt)
 
 */
-
-
-//require_once dirname(__FILE__) . '/debug.php';
+require_once dirname(__FILE__) . '/debug.php'; // line will be removed by Makefile
 
 
 $GLOBALS['_ti_base'] = null;
@@ -44,10 +42,9 @@ function endblock($name=null) {
 	if ($stack) {
 		$block = array_pop($stack);
 		if ($name && $name != $block['name']) {
-			_ti_warning("orphan endblock('$name')", $trace);
-		}else{
-			_ti_insertBlock($block);
+			_ti_warning("startblock('{$block['name']}') does not match endblock('$name')", $trace);
 		}
+		_ti_insertBlock($block);
 	}else{
 		_ti_warning(
 			$name ? "orphan endblock('$name')" : "orphan endblock()",
@@ -114,9 +111,7 @@ function flushblocks() {
 
 
 function blockbase() {
-	_ti_init(
-		_ti_callingTrace()
-	);
+	_ti_init(_ti_callingTrace());
 }
 
 
@@ -170,9 +165,11 @@ function _ti_newBlock($name, $filters, $trace) {
 			$filters = array($filters);
 		}
 		foreach ($filters as $i => $f) {
-			if ($f && is_string($f) && !function_exists($f)) {
+			if ($f && !is_callable($f)) {
 				_ti_warning(
-					"filter '$f' is not defined",
+					is_array($f) ?
+						"filter " . implode('::', $f) . " is not defined":
+						"filter '$f' is not defined", // TODO: better messaging for methods
 					$trace
 				);
 				$filters[$i] = null;

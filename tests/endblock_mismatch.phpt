@@ -1,16 +1,21 @@
 --TEST--
 
-orphan endblock and dangling startblock in a base template
+Enblock with the optional name parameter
 
 --FILE--
 
-<? error_reporting(E_ALL) ?>
 <? require_once 'ti.php' ?>
-<? include 'templates/base_broken.php' ?>
+<? include 'templates/base.php' ?>
 
 <? startblock('content') ?>
-my content
-<? endblock() ?>
+<p>
+the page content
+</p>
+<? endblock('xxx') ?>
+
+<? startblock('title') ?>
+the page title
+<? endblock('title') ?>
 
 --EXPECTF--
 
@@ -19,15 +24,16 @@ my content
 <link rel='stylesheet' type='text/css' href='main.css' />
 <script type='text/javascript' src='main.js'></script>
 </head>
-
-Warning: orphan endblock() in %s/base_broken.php on line 8
 <body>
 <div id='header'>
 <h1>
+the page title
 </h1>
 </div>
 <div id='content'>
-my content
+<p>
+the page content
+</p>
 </div>
 <div id='footer'>
 this is the default footer
@@ -35,4 +41,4 @@ this is the default footer
 </body>
 </html>
 
-Warning: missing endblock() for startblock('nothing') in %s/base_broken.php on line 18
+Warning: startblock('content') does not match endblock('xxx') in %s/endblock_mismatch.php on line 9

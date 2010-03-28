@@ -4,7 +4,7 @@ nested blocks
 
 --FILE--
 
-<? require_once '../src/ti.php' ?>
+<? require_once 'ti.php' ?>
 <? include 'templates/3col.php' ?>
 
 <? startblock('left') ?>

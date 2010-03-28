@@ -1,0 +1,22 @@
+#!/bin/sh
+
+cd "`dirname $0`"
+
+pear_version=""
+src_dir="../src"
+
+while getopts ":BV:" flag; do
+	shift;
+	case "$flag" in
+		V) pear_version="$OPTARG"; echo "PEAR version: $pear_version"; shift;;
+		B) src_dir="../build";;
+	esac
+done
+
+res=$(pear$pear_version run-tests -q -i " -d include_path=.:$src_dir" "$@" | tee /dev/tty)
+
+if [ "$(echo "$res" | grep "FAILED")" ]; then
+	exit 1
+else
+	exit 0
+fi

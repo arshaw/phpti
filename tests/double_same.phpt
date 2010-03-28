@@ -4,7 +4,7 @@ two consecutive same templates
 
 --FILE--
 
-<? require_once '../src/ti.php' ?>
+<? require_once 'ti.php' ?>
 <? include 'templates/page1.php' ?>
 <? include 'templates/page1.php' ?>
 

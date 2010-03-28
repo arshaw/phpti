@@ -5,7 +5,7 @@ throws a warning when omitted end tag in child template
 --FILE--
 
 <? error_reporting(E_ALL) ?>
-<? require_once '../src/ti.php'?>
+<? require_once 'ti.php'?>
 <? include 'templates/base.php' ?>
 
 <? endblock() ?>

@@ -5,7 +5,7 @@ Cannot have two blocks with same name in one file
 --FILE--
 
 <?
-require_once '../src/ti.php';
+require_once 'ti.php';
 include 'templates/base.php';
 ?>
 

@@ -1,15 +1,15 @@
 --TEST--
 
-getsuperblock function
+referencing a superblock, its filter should be applied
 
 --FILE--
 
 <? require_once 'ti.php' ?>
-<? include 'templates/base.php' ?>
+<? include 'templates/base_w_filter.php' ?>
 
 <? startblock('footer') ?>
 Copyright 2009
-<? echo str_repeat(trim(getsuperblock()), 2) ?>
+<? superblock() ?>
 <? endblock() ?>
 
 --EXPECT--
@@ -28,6 +28,6 @@ Copyright 2009
 </div>
 <div id='footer'>
 Copyright 2009
-this is the default footerthis is the default footer</div>
+*this is the default footer*</div>
 </body>
 </html>

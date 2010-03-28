@@ -1,21 +1,23 @@
 --TEST--
 
-Warns and does not execute filters that do not exist
+Filters work with the array('class','method')
 
 --FILE--
 
-<?php
+<?
 
 require_once 'ti.php';
 include 'templates/base.php';
 
-function filter1($s) {
-	return '*' . trim($s) . '*';
+class MyFilters {
+	function filter1($s) {
+		return '*' . trim($s) . '*';
+	}
 }
 
 ?>
 
-<? startblock('content', 'filter9,filter1') ?>
+<? startblock('content', array(array('MyFilters','filter1'), array('Nothing','method'))) ?>
 this is the content
 <? endblock() ?>
 
@@ -39,4 +41,4 @@ this is the default footer
 </body>
 </html>
 
-Warning: filter 'filter9' is not defined in %s/filters_bad.php on line 13
+Warning: filter Nothing::method is not defined in /home/adam/Projects/PHPTI/tests/filters_class.php on line 15

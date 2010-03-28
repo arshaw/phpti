@@ -4,7 +4,7 @@ Warning for nonexistant filter happens where block is defined
 
 --FILE--
 
-<? require '../src/ti.php' ?>
+<? require 'ti.php' ?>
 <html>
 <head>
 <? startblock('head') ?>

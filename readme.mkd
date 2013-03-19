@@ -14,7 +14,7 @@ need to learn another template language.
 Links
 -----
 
-- For a tutorial on how to use this library, visit [phpti.com](http://phpti.com/)
+- For a tutorial on how to use this library, visit the [project homepage](http://arshaw.com/phpti/)
 - For bugs, visit the [Issue Tracker](http://github.com/arshaw/phpti/issues)
 - For development, visit the [GitHub Project](http://github.com/arshaw/phpti)
 - Created by [Adam Shaw](http://arshaw.com/)

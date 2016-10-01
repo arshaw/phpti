@@ -1,3 +1,5 @@
 build
 dist
 src/debug_out.txt
+
+/vendor/

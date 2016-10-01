@@ -1,0 +1,11 @@
+{
+    "name": "arshaw/phpti",
+    "description": "Template Inheritance is an extremely useful technique for making reusable HTML layouts for a site",
+    "type": "library",
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "require": {},
+    "autoload": {
+        "files": ["src/ti.php"]
+    }
+}

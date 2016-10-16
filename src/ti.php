@@ -6,7 +6,7 @@ PHP Template Inheritance
 ------------------------
 Version: @VERSION
 Released: @DATE
-Website: http://phpti.com/
+Website: http://arshaw.com/phpti/
 Author: Adam Shaw (http://arshaw.com/)
 Released under the MIT License (license.txt)
 

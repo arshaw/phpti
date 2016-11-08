@@ -316,7 +316,7 @@ function _ti_warning($message, $trace, $warning_trace=null) {
 function _ti_callingTrace() {
 	$trace = debug_backtrace();
 	foreach ($trace as $i => $location) {
-		if ($location['file'] !== __FILE__) {
+		if (isset($location['file']) && $location['file'] !== __FILE__) {
 			return array_slice($trace, $i);
 		}
 	}

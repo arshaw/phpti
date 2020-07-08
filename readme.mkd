@@ -1,5 +1,5 @@
 
-*NOTE*: This project is no longer maintained! [more info](http://blog.arshaw.com/1/post/2013/03/reflecting-on-phpti.html)
+*NOTE*: This project is no longer maintained! [more info](https://arshaw.com/2013/03/reflecting-on-phpti)
 ---------------------------------------------------------
 
 PHP Template Inheritance (PHPTI)
